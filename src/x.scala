@@ -1,35 +1,30 @@
 package org.apache.spark.examples.streaming
 
-import scala.collection.mutable.Queue
+import org.apache.hadoop.io.LongWritable
 
+import scala.collection.mutable.Queue
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.log4j.{Level, Logger}
+
 
 object QueueStream extends App{
 
-    val sparkConf = new SparkConf().setAppName("QueueStream").setMaster("local")
-    // Create the context
-    val ssc = new StreamingContext(sparkConf, Seconds(1))
+  Logger.getLogger("org").setLevel(Level.WARN)
+  val conf = new SparkConf().setAppName("QueueStream").setMaster("local[3]")
+  // Create the context
+  val ssc = new StreamingContext(conf, Seconds(1))
+  //val sparkContext = new SparkContext(conf)
+  val rdd  = ssc.sparkContext.textFile("/Users/Renae/Desktop/stream/*")
+  val rddQueue: Queue[RDD[String]] = Queue()
+  val dstream = ssc.queueStream(rddQueue)
+  val stuff = dstream.map((_,1))
+  stuff.print()
+  rddQueue += rdd
 
 
-    // Create the queue through which RDDs can be pushed to
-    // a QueueInputDStream
-    val rddQueue = new Queue[RDD[String]]()
-
-    // Create the QueueInputDStream and use it do some processing
-    val inputStream = ssc.queueStream(rddQueue)
-    val mappedStream = inputStream.flatMap(x => (x.split(" "))).map((_, 1))
-    val reducedStream = mappedStream.reduceByKey(_ + _)
-    reducedStream.print()
-    ssc.start()
-
-    // Create and push some RDDs into rddQueue
-    for (i <- 1 to 30) {
-      rddQueue.synchronized {
-        rddQueue += ssc.sparkContext.textFile("/users/Renae/Desktop/testBook.txt")
-      }
-      Thread.sleep(1000)
-    }
-    ssc.stop()
+  ssc.start()
+  ssc.awaitTermination()
 }
